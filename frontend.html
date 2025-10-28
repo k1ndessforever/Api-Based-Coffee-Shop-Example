@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffee Shop - Frontend</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { 
+            color: #333; 
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle { 
+            color: #666; 
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+        .menu-item { 
+            background: #f9f9f9; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+        .menu-item:hover { 
+            transform: translateX(5px);
+            background: #f0f0f0;
+        }
+        .item-info h3 { 
+            color: #764ba2; 
+            margin-bottom: 5px;
+        }
+        .item-info p { 
+            color: #666; 
+            font-size: 0.9em;
+        }
+        .price { 
+            font-weight: bold; 
+            color: #667eea; 
+            font-size: 1.2em;
+        }
+        button { 
+            background: #667eea; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+        button:hover { 
+            background: #764ba2; 
+        }
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed;
+        }
+        .cart { 
+            background: #f0f4ff; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px;
+            border: 2px solid #667eea;
+        }
+        .cart h2 { 
+            color: #667eea; 
+            margin-bottom: 15px;
+        }
+        .cart-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .cart-total { 
+            font-size: 1.3em; 
+            font-weight: bold; 
+            color: #764ba2; 
+            margin-top: 15px;
+            text-align: right;
+        }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            border: 2px solid #ddd; 
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        input:focus { 
+            outline: none; 
+            border-color: #667eea;
+        }
+        .loading { 
+            color: #667eea; 
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            padding: 15px; 
+            border-radius: 5px;
+            margin: 15px 0;
+            border: 1px solid #c3e6cb;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            padding: 15px; 
+            border-radius: 5px;
+            margin: 15px 0;
+            border: 1px solid #f5c6cb;
+        }
+        .api-status {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #856404;
+        }
+        .orders-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #ddd;
+        }
+        .order-card {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>☕ The Daily Brew</h1>
+        <p class="subtitle">API-Powered Coffee Shop</p>
+        
+        <div class="api-status" id="apiStatus">
+            🔗 Connecting to API at <strong>http://localhost:3000</strong>
+        </div>
+
+        <!-- MENU SECTION -->
+        <div id="menuSection">
+            <h2>Our Menu</h2>
+            <div id="menuList">
+                <p class="loading">Loading menu...</p>
+            </div>
+        </div>
+
+        <!-- CART SECTION -->
+        <div class="cart" id="cartSection" style="display: none;">
+            <h2>🛒 Your Cart</h2>
+            <div id="cartItems"></div>
+            <div class="cart-total" id="cartTotal">Total: ₹0</div>
+            
+            <input 
+                type="text" 
+                id="customerName" 
+                placeholder="Enter your name"
+            >
+            
+            <button onclick="placeOrder()" id="orderButton">
+                Place Order
+            </button>
+        </div>
+
+        <div id="message"></div>
+
+        <!-- ORDERS SECTION -->
+        <div class="orders-section">
+            <h2>📋 Recent Orders</h2>
+            <button onclick="loadOrders()">Refresh Orders</button>
+            <div id="ordersList"></div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // FRONTEND JAVASCRIPT - Talks to Backend API
+        // ============================================
+
+        // API Base URL (where your backend is running)
+        const API_URL = 'http://localhost:3000/api';
+
+        let cart = [];
+        let menu = [];
+
+        // ============================================
+        // FUNCTION 1: Load Menu from API (GET Request)
+        // ============================================
+        async function loadMenu() {
+            try {
+                console.log('🔄 Making API call: GET /api/menu');
+                
+                // FETCH = Make HTTP request to backend
+                const response = await fetch(`${API_URL}/menu`);
+                
+                console.log('📡 Response status:', response.status);
+                
+                // Check if request was successful
+                if (!response.ok) {
+                    throw new Error('Failed to load menu');
+                }
+                
+                // Parse JSON response
+                const data = await response.json();
+                console.log('✅ Received data:', data);
+                
+                menu = data.data; // Store menu
+                displayMenu(menu); // Show on page
+                
+                document.getElementById('apiStatus').innerHTML = 
+                    '✅ Connected to API successfully!';
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                document.getElementById('menuList').innerHTML = 
+                    `<p class="error">⚠️ Cannot connect to API!<br><br>
+                    <strong>Make sure:</strong><br>
+                    1. Backend server is running (node backend/server.js)<br>
+                    2. Server is at http://localhost:3000<br>
+                    3. CORS is enabled on backend</p>`;
+                
+                document.getElementById('apiStatus').innerHTML = 
+                    '❌ Failed to connect to API';
+            }
+        }
+
+        // Display menu items on page
+        function displayMenu(menuItems) {
+            const menuList = document.getElementById('menuList');
+            menuList.innerHTML = '';
+            
+            menuItems.forEach(item => {
+                menuList.innerHTML += `
+                    <div class="menu-item">
+                        <div class="item-info">
+                            <h3>${item.name}</h3>
+                            <p>${item.description}</p>
+                            <span class="price">₹${item.price}</span>
+                        </div>
+                        <button onclick="addToCart(${item.id})">Add to Cart</button>
+                    </div>
+                `;
+            });
+        }
+
+        // ============================================
+        // FUNCTION 2: Add item to cart (Frontend only)
+        // ============================================
+        function addToCart(itemId) {
+            const item = menu.find(m => m.id === itemId);
+            if (item) {
+                cart.push(item);
+                updateCart();
+                showMessage('✅ Added to cart!', 'success');
+            }
+        }
+
+        // Update cart display
+        function updateCart() {
+            const cartSection = document.getElementById('cartSection');
+            const cartItems = document.getElementById('cartItems');
+            const cartTotal = document.getElementById('cartTotal');
+            
+            if (cart.length === 0) {
+                cartSection.style.display = 'none';
+                return;
+            }
+            
+            cartSection.style.display = 'block';
+            
+            // Display cart items
+            cartItems.innerHTML = '';
+            cart.forEach((item, index) => {
+                cartItems.innerHTML += `
+                    <div class="cart-item">
+                        <span>${item.name}</span>
+                        <span>₹${item.price}</span>
+                    </div>
+                `;
+            });
+            
+            // Calculate total
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
+            cartTotal.innerHTML = `Total: ₹${total}`;
+        }
+
+        // ============================================
+        // FUNCTION 3: Place Order (POST Request)
+        // ============================================
+        async function placeOrder() {
+            const customerName = document.getElementById('customerName').value;
+            
+            // Validation
+            if (!customerName) {
+                showMessage('⚠️ Please enter your name', 'error');
+                return;
+            }
+            
+            if (cart.length === 0) {
+                showMessage('⚠️ Cart is empty', 'error');
+                return;
+            }
+            
+            // Prepare order data
+            const orderData = {
+                customerName: customerName,
+                items: cart,
+                total: cart.reduce((sum, item) => sum + item.price, 0)
+            };
+            
+            console.log('🔄 Making API call: POST /api/orders');
+            console.log('📦 Sending data:', orderData);
+            
+            // Disable button while processing
+            const orderButton = document.getElementById('orderButton');
+            orderButton.disabled = true;
+            orderButton.textContent = 'Processing...';
+            
+            try {
+                // FETCH with POST method
+                const response = await fetch(`${API_URL}/orders`, {
+                    method: 'POST',  // HTTP Method
+                    headers: {
+                        'Content-Type': 'application/json'  // Telling server we're sending JSON
+                    },
+                    body: JSON.stringify(orderData)  // Convert JS object to JSON string
+                });
+                
+                console.log('📡 Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to place order');
+                }
+                
+                const result = await response.json();
+                console.log('✅ Order placed:', result);
+                
+                // Success!
+                showMessage(`🎉 Order #${result.data.id} placed successfully!`, 'success');
+                
+                // Clear cart
+                cart = [];
+                updateCart();
+                document.getElementById('customerName').value = '';
+                
+                // Reload orders
+                loadOrders();
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                showMessage('❌ Failed to place order: ' + error.message, 'error');
+            } finally {
+                // Re-enable button
+                orderButton.disabled = false;
+                orderButton.textContent = 'Place Order';
+            }
+        }
+
+        // ============================================
+        // FUNCTION 4: Load All Orders (GET Request)
+        // ============================================
+        async function loadOrders() {
+            try {
+                console.log('🔄 Making API call: GET /api/orders');
+                
+                const response = await fetch(`${API_URL}/orders`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load orders');
+                }
+                
+                const data = await response.json();
+                console.log('✅ Received orders:', data);
+                
+                displayOrders(data.data);
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                document.getElementById('ordersList').innerHTML = 
+                    `<p class="error">Failed to load orders</p>`;
+            }
+        }
+
+        // Display orders on page
+        function displayOrders(orders) {
+            const ordersList = document.getElementById('ordersList');
+            
+            if (orders.length === 0) {
+                ordersList.innerHTML = '<p style="color: #666; margin-top: 10px;">No orders yet</p>';
+                return;
+            }
+            
+            ordersList.innerHTML = '';
+            orders.forEach(order => {
+                const itemsList = order.items.map(item => 
+                    `<li>${item.name} - ₹${item.price}</li>`
+                ).join('');
+                
+                ordersList.innerHTML += `
+                    <div class="order-card">
+                        <h3>Order #${order.id}</h3>
+                        <p><strong>Customer:</strong> ${order.customerName}</p>
+                        <p><strong>Status:</strong> ${order.status}</p>
+                        <p><strong>Items:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            ${itemsList}
+                        </ul>
+                        <p style="margin-top: 10px;"><strong>Total: ₹${order.total}</strong></p>
+                        <p style="font-size: 0.8em; color: #666;">${new Date(order.timestamp).toLocaleString()}</p>
+                    </div>
+                `;
+            });
+        }
+
+        // Show message to user
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<p class="${type}">${text}</p>`;
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 3000);
+        }
+
+        // ============================================
+        // INITIALIZE: Load menu when page loads
+        // ============================================
+        window.onload = function() {
+            console.log('🚀 Page loaded, fetching menu...');
+            loadMenu();
+            loadOrders();
+        };
+    </script>
+</body>
+</html>
